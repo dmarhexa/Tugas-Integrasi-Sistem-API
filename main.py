@@ -1,61 +1,143 @@
 # ===== 1. IMPORT =====
-from fastapi import FastAPI, HTTPException  # FastAPI = kerangka API, HTTPException = pengirim pesan error (misal 404)
-from pydantic import BaseModel              # dasar membuat "formulir" data yang divalidasi otomatis
-from typing import Optional                 # menandai isian yang boleh kosong
+
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+from typing import Optional
+
+# Bagian ini digunakan untuk mengambil library yang diperlukan.
+# FastAPI untuk membuat API, BaseModel untuk membuat format data,
+# dan HTTPException untuk menangani error.
+
 
 # ===== 2. MEMBUAT APLIKASI =====
-app = FastAPI()  # membangun aplikasi; nama "app" dipakai oleh semua decorator di bawah
 
-# ===== 3. MODEL DATA =====
-class Item(BaseModel):                  # formulir data mahasiswa
-    nama: str                           # WAJIB diisi (tidak ada Optional dan tidak ada nilai bawaan)
-    alamat: Optional[str] = None        # teks, boleh kosong
-    ipk: Optional[float] = None         # angka desimal, boleh kosong; diisi "abc" -> error 422
-    semester: Optional[int] = None      # angka bulat, boleh kosong
-    hobi: Optional[str] = None          # teks, boleh kosong
+app = FastAPI()
 
-# ===== 4. PENYIMPANAN SEMENTARA =====
-items_db = {}  # dictionary kosong: kunci = ID, nilai = data mahasiswa; hilang saat server mati
+# Membuat aplikasi FastAPI yang nantinya digunakan
+# untuk menjalankan semua endpoint.
+
+
+# ===== 3. MODEL DATA MAHASISWA =====
+
+class Mahasiswa(BaseModel):
+    nama: str
+    alamat: Optional[str] = None
+    ipk: Optional[float] = None
+    semester: Optional[int] = None
+    hobi: Optional[str] = None
+
+# Bagian ini menentukan data mahasiswa yang akan digunakan.
+# ID dan nama wajib diisi, sedangkan alamat, IPK, semester,
+# dan hobi boleh dikosongkan.
+
+
+# ===== 4. PENYIMPANAN DATA =====
+
+mahasiswa_db = {}
+
+# Data mahasiswa disimpan sementara di dictionary.
+# Data akan hilang jika server dimatikan.
+
 
 # ===== 5. ROOT =====
-@app.get("/")                           # GET ke alamat / dijalankan oleh fungsi di bawah
+
+@app.get("/")
 def read_root():
-    return {"message": "Hallo selamat datang. Semoga harimu menyenangkan!"}  # dictionary -> otomatis jadi JSON
+    return {"message": "Halo Selamat datang! Have A Nice Day!"}
 
-# ===== 6. CREATE =====
-@app.post("/items/", status_code=201)   # POST ke /items/; 201 = "berhasil dan data baru dibuat"
-async def create_item(item: Item):      # JSON dari klien divalidasi sesuai formulir Item
-    item_id = len(items_db) + 1         # ID baru = jumlah data sekarang + 1
-    items_db[item_id] = {"id": item_id, **item.dict()}
-    # item.dict() = ubah objek jadi dictionary biasa
-    # **          = tuangkan semua isinya ke dictionary baru
-    # hasil: {"id": 1, "nama": "...", "alamat": "...", ...}, disimpan dengan ID sebagai kunci
-    return {"message": f"Item created with ID: {item_id}", "item": items_db[item_id]}  # bukti ke klien
+# Endpoint ini hanya digunakan untuk menampilkan
+# pesan selamat datang ketika API dibuka.
 
-# ===== 7. READ =====
-@app.get("/items/{item_id}")            # {item_id} = bagian alamat yang berubah-ubah (path parameter)
-async def read_item(item_id: int):      # diambil dari alamat; ": int" = harus angka bulat
-    if item_id in items_db:             # kalau ID ada...
-        return {"item_id": item_id, "item": items_db[item_id]}  # ...kirim datanya
-    else:                               # kalau tidak ada...
-        raise HTTPException(status_code=404, detail="Item not found")  # ...hentikan dan kirim error 404
 
-# ===== 8. UPDATE =====
-@app.put("/items/{item_id}")            # PUT ke /items/3 misalnya
-async def update_item(item_id: int, item: Item):  # item_id dari alamat, item (data baru) dari body JSON
-    if item_id in items_db:
-        items_db[item_id].update(item.dict(exclude_unset=True))
-        # exclude_unset=True = hanya ambil field yang BENAR-BENAR dikirim klien
-        # update()           = timpa nilai lama dengan nilai baru, field lain dibiarkan
-        return {"message": f"Item with ID: {item_id} updated", "item": items_db[item_id]}
+# ===== 6. CREATE / MENAMBAH DATA =====
+
+@app.post("/mahasiswa/", status_code=201)
+async def create_mahasiswa(mahasiswa: Mahasiswa):
+
+    if mahasiswa.id in mahasiswa_db:
+        raise HTTPException(
+            status_code=400,
+            detail="ID mahasiswa sudah digunakan"
+        )
+
+    mahasiswa_db[mahasiswa.id] = mahasiswa.dict()
+
+    return {
+        "message": f"Mahasiswa created with ID: {mahasiswa.id}",
+        "mahasiswa": mahasiswa_db[mahasiswa.id]
+    }
+
+# Endpoint POST digunakan untuk menambahkan mahasiswa.
+# ID dimasukkan secara manual oleh pengguna.
+# Jika ID sudah digunakan, maka akan muncul error 400.
+
+
+# ===== 7. READ / MELIHAT DATA =====
+
+@app.get("/mahasiswa/{mahasiswa_id}")
+async def read_mahasiswa(mahasiswa_id: int):
+
+    if mahasiswa_id in mahasiswa_db:
+        return {
+            "mahasiswa_id": mahasiswa_id,
+            "mahasiswa": mahasiswa_db[mahasiswa_id]
+        }
+
     else:
-        raise HTTPException(status_code=404, detail="Item not found")
+        raise HTTPException(
+            status_code=404,
+            detail="Mahasiswa not found"
+        )
 
-# ===== 9. DELETE =====
-@app.delete("/items/{item_id}")         # DELETE ke /items/3 misalnya
-async def delete_item(item_id: int):
-    if item_id in items_db:
-        deleted_item = items_db.pop(item_id)  # pop() = hapus dari dictionary SEKALIGUS mengembalikan isinya
-        return {"message": f"Item with ID: {item_id} deleted", "item": deleted_item}
+# Endpoint GET digunakan untuk melihat data mahasiswa
+# berdasarkan ID. Jika ID tidak ditemukan, muncul error 404.
+
+
+# ===== 8. UPDATE / MENGUBAH DATA =====
+
+@app.put("/mahasiswa/{mahasiswa_id}")
+async def update_mahasiswa(
+    mahasiswa_id: int,
+    mahasiswa: Mahasiswa
+):
+
+    if mahasiswa_id in mahasiswa_db:
+        mahasiswa_db[mahasiswa_id] = mahasiswa.dict()
+
+        return {
+            "message": f"Mahasiswa with ID: {mahasiswa_id} updated",
+            "mahasiswa": mahasiswa_db[mahasiswa_id]
+        }
+
     else:
-        raise HTTPException(status_code=404, detail="Item not found")
+        raise HTTPException(
+            status_code=404,
+            detail="Mahasiswa not found"
+        )
+
+# Endpoint PUT digunakan untuk mengubah data mahasiswa.
+# Data lama akan diganti dengan data yang baru.
+# Jika ID tidak ditemukan, muncul error 404.
+
+
+# ===== 9. DELETE / MENGHAPUS DATA =====
+
+@app.delete("/mahasiswa/{mahasiswa_id}")
+async def delete_mahasiswa(mahasiswa_id: int):
+
+    if mahasiswa_id in mahasiswa_db:
+        deleted_mahasiswa = mahasiswa_db.pop(mahasiswa_id)
+
+        return {
+            "message": f"Mahasiswa with ID: {mahasiswa_id} deleted",
+            "mahasiswa": deleted_mahasiswa
+        }
+
+    else:
+        raise HTTPException(
+            status_code=404,
+            detail="Mahasiswa not found"
+        )
+
+# Endpoint DELETE digunakan untuk menghapus data mahasiswa
+# berdasarkan ID. Jika ID tidak ditemukan, muncul error 404.
