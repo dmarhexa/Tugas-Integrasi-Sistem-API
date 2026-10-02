@@ -11,7 +11,10 @@ from typing import Optional
 
 # ===== 2. MEMBUAT APLIKASI =====
 
-app = FastAPI()
+app = FastAPI(
+    title="API Mahasiswa",
+    description="API untuk mengelola data mahasiswa",
+)
 
 # Membuat aplikasi FastAPI yang nantinya digunakan
 # untuk menjalankan semua endpoint.
